@@ -1,0 +1,90 @@
+---
+# Scheduling tasks for GitHub Enterprise Server Backup Utilities
+
+- name: Create backup script wrapper
+  ansible.builtin.template:
+    src: backup-wrapper.sh.j2
+    dest: "{{ backup_utils_install_dir }}/bin/backup-wrapper.sh"
+    owner: "{{ backup_utils_user }}"
+    group: "{{ backup_utils_group }}"
+    mode: '0755'
+  register: wrapper_script
+
+- name: Create backup log directory
+  ansible.builtin.file:
+    path: "{{ backup_utils_log_dir }}"
+    state: directory
+    owner: "{{ backup_utils_user }}"
+    group: "{{ backup_utils_group }}"
+    mode: '0750'
+
+- name: Configure systemd timer for backups
+  when: use_systemd | bool
+  block:
+    - name: Create systemd service file
+      ansible.builtin.template:
+        src: github-backup.service.j2
+        dest: /etc/systemd/system/github-backup.service
+        owner: root
+        group: root
+        mode: '0644'
+      register: systemd_service
+
+    - name: Create systemd timer file
+      ansible.builtin.template:
+        src: github-backup.timer.j2
+        dest: /etc/systemd/system/github-backup.timer
+        owner: root
+        group: root
+        mode: '0644'
+      register: systemd_timer
+
+    - name: Reload systemd daemon
+      ansible.builtin.systemd:
+        daemon_reload: true
+      when: systemd_service is changed or systemd_timer is changed
+
+    - name: Enable and start systemd timer
+      ansible.builtin.systemd:
+        name: github-backup.timer
+        enabled: true
+        state: started
+      when: systemd_timer is changed
+
+    - name: Disable cron job if exists
+      ansible.builtin.cron:
+        name: "GitHub Enterprise backup"
+        user: "{{ backup_utils_user }}"
+        state: absent
+      when: use_cron | bool
+
+- name: Configure cron job for backups
+  when: use_cron | bool and not (use_systemd | bool)
+  block:
+    - name: Set up cron job for regular backups
+      ansible.builtin.cron:
+        name: "GitHub Enterprise backup"
+        user: "{{ backup_utils_user }}"
+        hour: "{{ backup_schedule_hour }}"
+        minute: "{{ backup_schedule_minute }}"
+        job: "{{ backup_utils_install_dir }}/bin/backup-wrapper.sh >> {{ backup_utils_log_dir }}/backup-$(date +\\%Y\\%m\\%d).log 2>&1"
+        state: present
+
+- name: Create backup rotation script
+  ansible.builtin.template:
+    src: rotate-backups.sh.j2
+    dest: "{{ backup_utils_install_dir }}/bin/rotate-backups.sh"
+    owner: "{{ backup_utils_user }}"
+    group: "{{ backup_utils_group }}"
+    mode: '0755'
+  when: backup_rotation_enabled | default(true) | bool
+
+- name: Configure backup rotation
+  when: backup_rotation_enabled | default(true) | bool and use_cron | bool
+  ansible.builtin.cron:
+    name: "GitHub Enterprise backup rotation"
+    user: "{{ backup_utils_user }}"
+    hour: "{{ backup_rotation_hour | default('3') }}"
+    minute: "{{ backup_rotation_minute | default('30') }}"
+    job: "{{ backup_utils_install_dir }}/bin/rotate-backups.sh >> {{ backup_utils_log_dir }}/rotation-$(date +\\%Y\\%m\\%d).log 2>&1"
+    state: present
