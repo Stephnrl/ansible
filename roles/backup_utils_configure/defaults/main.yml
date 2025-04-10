@@ -1,0 +1,29 @@
+---
+# Default variables for backup_utils_configure role
+
+# Installation paths
+backup_utils_install_dir: "/opt/github-backup-utils"
+backup_utils_data_dir: "/data/github-backups"
+backup_utils_tmp_dir: "/tmp/github-backups"
+
+# User and group
+backup_utils_user: "backup"
+backup_utils_group: "backup"
+
+# GitHub Enterprise Server settings
+ghe_hostname: "github.example.com"
+ghe_port: 122
+ghe_ssh_user: "admin"
+
+# Backup configuration
+backup_utils_git_mode: "mirror"  # mirror or backup
+backup_utils_verbose: false      # Set to true for verbose backup output
+backup_utils_incremental: true   # Set to false to disable incremental backups
+backup_utils_leave_running: false # Set to true to leave backup running if another instance is running
+
+# Snapshot settings
+backup_utils_max_snapshots: 10   # Number of snapshots to keep
+
+# Network settings
+backup_utils_fscp_concurrency: 20
+backup_utils_fscp_limit_rate: ""  # Empty means no limit, e.g. "10m" for 10 megabits/sec
