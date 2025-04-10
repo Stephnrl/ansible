@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# GitHub Enterprise Backup Utilities Configuration
+# {{ ansible_managed }}
+
+# GitHub Enterprise host
+GHE_HOSTNAME="{{ ghe_hostname }}"
+
+# GitHub Enterprise SSH port
+GHE_SSH_PORT="{{ ghe_port }}"
+
+# GitHub Enterprise SSH user
+GHE_SSH_USER="{{ ghe_ssh_user }}"
+
+# Location to store backup snapshots
+GHE_DATA_DIR="{{ backup_utils_data_dir }}"
+
+# Location to store temporary backup working files
+GHE_TEMP_DIR="{{ backup_utils_tmp_dir }}"
+
+# Backup mode
+GHE_GIT_BACKUP_MODE="{{ backup_utils_git_mode }}"
+
+{% if backup_utils_incremental %}
+# Enable or disable incremental backups
+GHE_INCREMENTAL_BACKUP=true
+{% else %}
+# Enable or disable incremental backups
+GHE_INCREMENTAL_BACKUP=false
+{% endif %}
+
+{% if backup_utils_verbose %}
+# Output additional information about each backup step
+GHE_VERBOSE=true
+{% else %}
+# Output additional information about each backup step
+GHE_VERBOSE=false
+{% endif %}
+
+{% if backup_utils_leave_running %}
+# Don't abort if another instance of backup-utils is running
+GHE_LEAVE_RUNNING=true
+{% else %}
+# Abort if another instance of backup-utils is running
+GHE_LEAVE_RUNNING=false
+{% endif %}
+
+# Number of snapshots to keep (default: 10)
+GHE_NUM_SNAPSHOTS="{{ backup_utils_max_snapshots }}"
+
+# Filesystem transfer concurrency (default: 20)
+GHE_PARALLEL_ENABLED=true
+GHE_PARALLEL_FSCP_CONCURRENCY="{{ backup_utils_fscp_concurrency }}"
+
+{% if backup_utils_fscp_limit_rate %}
+# Filesystem transfer rate limit
+GHE_BANDWIDTH_LIMIT="{{ backup_utils_fscp_limit_rate }}"
+{% endif %}
+
+# Custom SSH options
+# GHE_EXTRA_SSH_OPTS="-o ConnectTimeout=10"
+
+# Custom SSH identity file path
+GHE_SSH_IDENTITY_FILE="{{ backup_utils_install_dir }}/credentials/ghe-ssh-key"
+
+# Allow custom SSH credential (user/key) for various host types
+# GHE_EXTRA_FRONTEND_SSH_USER="admin"
+# GHE_EXTRA_FRONTEND_SSH_IDENTITY_FILE="/path/to/key"
