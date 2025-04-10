@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# GitHub Enterprise Backup Wrapper Script
+# {{ ansible_managed }}
+
+# Set path to ensure commands are found
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# Log start time
+echo "===== GitHub Enterprise Backup starting at $(date) ====="
+
+# Execute pre-hook script if defined
+{% if backup_pre_hook_script != "" %}
+if [ -x "{{ backup_pre_hook_script }}" ]; then
+  echo "Running pre-backup hook script"
+  "{{ backup_pre_hook_script }}"
+fi
+{% endif %}
+
+# Run the backup command
+{% if backup_utils_verbose %}
+"{{ backup_utils_install_dir }}/bin/ghe-backup" -v
+{% else %}
+"{{ backup_utils_install_dir }}/bin/ghe-backup"
+{% endif %}
+
+# Save exit status
+BACKUP_STATUS=$?
+
+# Log completion time
+echo "===== GitHub Enterprise Backup completed at $(date) with status $BACKUP_STATUS ====="
+
+# Execute post-hook script if defined
+{% if backup_post_hook_script != "" %}
+if [ -x "{{ backup_post_hook_script }}" ]; then
+  echo "Running post-backup hook script"
+  "{{ backup_post_hook_script }}" $BACKUP_STATUS
+fi
+{% endif %}
+
+# Execute failure hook script if backup failed
+if [ $BACKUP_STATUS -ne 0 ]; then
+  echo "Backup failed with exit code $BACKUP_STATUS"
+  
+  {% if backup_failure_hook_script != "" %}
+  if [ -x "{{ backup_failure_hook_script }}" ]; then
+    echo "Running failure hook script"
+    "{{ backup_failure_hook_script }}" $BACKUP_STATUS
+  fi
+  {% endif %}
+  
+  {% if backup_email_notification %}
+  # Send failure notification email
+  SUBJECT="[FAILED] GitHub Enterprise Backup on {{ ansible_fqdn }}"
+  BODY="GitHub Enterprise Backup failed on {{ ansible_fqdn }} at $(date) with status code $BACKUP_STATUS.
+  
+Please check the logs at {{ backup_utils_log_dir }} for details."
+  
+  echo "$BODY" | mail -s "$SUBJECT" -r "{{ backup_email_sender }}" {{ backup_email_recipients }}
+  {% endif %}
+fi
+
+exit $BACKUP_STATUS
