@@ -1,0 +1,25 @@
+[Unit]
+Description=GitHub Enterprise Server Backup
+Documentation=https://github.com/github/backup-utils
+After=network.target
+
+[Service]
+Type=oneshot
+User={{ backup_utils_user }}
+Group={{ backup_utils_group }}
+WorkingDirectory={{ backup_utils_install_dir }}
+ExecStart={{ backup_utils_install_dir }}/bin/backup-wrapper.sh
+StandardOutput=append:{{ backup_utils_log_dir }}/backup-%Y%m%d.log
+StandardError=inherit
+SyslogIdentifier=github-backup
+KillMode=process
+KillSignal=SIGTERM
+TimeoutStopSec=90m
+
+# Hardening
+ProtectSystem=full
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
