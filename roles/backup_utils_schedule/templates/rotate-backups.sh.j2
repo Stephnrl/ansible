@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+# GitHub Enterprise Backup Rotation Script
+# {{ ansible_managed }}
+
+# Set path to ensure commands are found
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# Log start time
+echo "===== GitHub Enterprise Backup Rotation starting at $(date) ====="
+
+# Directories
+BACKUP_DIR="{{ backup_utils_data_dir }}/snapshots"
+DAILY_DIR="${BACKUP_DIR}/daily"
+WEEKLY_DIR="${BACKUP_DIR}/weekly"
+MONTHLY_DIR="${BACKUP_DIR}/monthly"
+
+# Create rotation directories if they don't exist
+mkdir -p "${DAILY_DIR}" "${WEEKLY_DIR}" "${MONTHLY_DIR}"
+
+# Retention settings
+DAILY_RETENTION={{ backup_retention.daily }}
+WEEKLY_RETENTION={{ backup_retention.weekly }}
+MONTHLY_RETENTION={{ backup_retention.monthly }}
+
+# Get the current date components
+DAY_OF_WEEK=$(date +%u)    # 1-7 (Monday-Sunday)
+DAY_OF_MONTH=$(date +%d)   # 01-31
+CURR_DATE=$(date +%Y%m%d)
+
+# Function to rotate backups
+rotate_backup() {
+  local latest_backup=$(ls -t "${BACKUP_DIR}" | grep -E "^[0-9]{14}$" | head -1)
+  
+  if [ -z "$latest_backup" ]; then
+    echo "No backup found to rotate"
+    return 1
+  fi
+  
+  echo "Latest backup: ${latest_backup}"
+  
+  # Daily backup - make a hard link copy
+  local daily_backup="${DAILY_DIR}/${latest_backup}"
+  if [ ! -e "${daily_backup}" ]; then
+    echo "Creating daily backup: ${daily_backup}"
+    cp -al "${BACKUP_DIR}/${latest_backup}" "${daily_backup}"
+  fi
+  
+  # Weekly backup - Mondays (or configured day)
+  if [ "$DAY_OF_WEEK" -eq {{ backup_weekly_day | default(1) }} ]; then
+    local weekly_backup="${WEEKLY_DIR}/${latest_backup}"
+    if [ ! -e "${weekly_backup}" ]; then
+      echo "Creating weekly backup: ${weekly_backup}"
+      cp -al "${BACKUP_DIR}/${latest_backup}" "${weekly_backup}"
+    fi
+  fi
+  
+  # Monthly backup - 1st of the month (or configured day)
+  if [ "$DAY_OF_MONTH" -eq "{{ backup_monthly_day | default('01') }}" ]; then
+    local monthly_backup="${MONTHLY_DIR}/${latest_backup}"
+    if [ ! -e "${monthly_backup}" ]; then
+      echo "Creating monthly backup: ${monthly_backup}"
+      cp -al "${BACKUP_DIR}/${latest_backup}" "${monthly_backup}"
+    fi
+  fi
+}
+
+# Function to prune old backups
+prune_backups() {
+  # Prune daily backups
+  echo "Pruning daily backups (keeping ${DAILY_RETENTION} most recent)"
+  cd "${DAILY_DIR}" && ls -t | grep -E "^[0-9]{14}$" | tail -n +$((DAILY_RETENTION+1)) | xargs -r rm -rf
+  
+  # Prune weekly backups
+  echo "Pruning weekly backups (keeping ${WEEKLY_RETENTION} most recent)"
+  cd "${WEEKLY_DIR}" && ls -t | grep -E "^[0-9]{14}$" | tail -n +$((WEEKLY_RETENTION+1)) | xargs -r rm -rf
+  
+  # Prune monthly backups
+  echo "Pruning monthly backups (keeping ${MONTHLY_RETENTION} most recent)"
+  cd "${MONTHLY_DIR}" && ls -t | grep -E "^[0-9]{14}$" | tail -n +$((MONTHLY_RETENTION+1)) | xargs -r rm -rf
+}
+
+# Main execution
+rotate_backup
+prune_backups
+
+# Log completion time
+echo "===== GitHub Enterprise Backup Rotation completed at $(date) ====="
+
+exit 0
