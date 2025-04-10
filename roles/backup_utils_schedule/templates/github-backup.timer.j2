@@ -1,0 +1,13 @@
+[Unit]
+Description=Scheduled GitHub Enterprise Server Backup
+Documentation=https://github.com/github/backup-utils
+Requires=github-backup.service
+
+[Timer]
+Unit=github-backup.service
+OnCalendar=*-*-* {{ backup_schedule_hour }}:{{ backup_schedule_minute }}:00
+RandomizedDelaySec=60
+Persistent=true
+
+[Install]
+WantedBy=timers.target
