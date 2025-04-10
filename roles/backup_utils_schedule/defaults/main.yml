@@ -1,0 +1,37 @@
+---
+# Default variables for backup_utils_schedule role
+
+# Installation paths
+backup_utils_install_dir: "/opt/github-backup-utils"
+backup_utils_data_dir: "/data/github-backups"
+backup_utils_log_dir: "/var/log/github-backup"
+
+# User and group
+backup_utils_user: "backup"
+backup_utils_group: "backup"
+
+# Schedule configuration
+backup_schedule_enabled: true
+backup_schedule_hour: "*/6"    # Every 6 hours (0, 6, 12, 18)
+backup_schedule_minute: "0"    # At minute 0
+
+# Backup rotation
+backup_rotation_enabled: true
+backup_rotation_hour: "3"      # At 3 AM
+backup_rotation_minute: "30"   # At minute 30
+backup_retention: {
+  "daily": 7,
+  "weekly": 4,
+  "monthly": 6
+}
+
+# Email notification settings
+backup_email_notification: false
+backup_email_recipients: "admin@example.com"
+backup_email_sender: "github-backup@{{ ansible_fqdn }}"
+backup_smtp_server: "localhost"
+
+# Monitoring hooks
+backup_pre_hook_script: ""
+backup_post_hook_script: ""
+backup_failure_hook_script: ""
