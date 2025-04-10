@@ -1,0 +1,68 @@
+---
+# Configuration tasks for GitHub Enterprise Server Backup Utilities
+
+- name: Ensure SSH connectivity to GitHub Enterprise Server
+  ansible.builtin.shell: |
+    ssh-keyscan -p {{ ghe_port }} {{ ghe_hostname }} >> ~/.ssh/known_hosts
+  args:
+    executable: /bin/bash
+    creates: "~/.ssh/known_hosts"
+  become: true
+  become_user: "{{ backup_utils_user }}"
+  changed_when: false
+
+- name: Create backup configuration file
+  ansible.builtin.template:
+    src: backup.config.j2
+    dest: "{{ backup_utils_install_dir }}/backup.config"
+    owner: "{{ backup_utils_user }}"
+    group: "{{ backup_utils_group }}"
+    mode: '0640'
+  register: backup_config_updated
+
+- name: Set permissions on backup utilities directory
+  ansible.builtin.file:
+    path: "{{ backup_utils_install_dir }}"
+    state: directory
+    owner: "{{ backup_utils_user }}"
+    group: "{{ backup_utils_group }}"
+    mode: '0750'
+    recurse: true
+
+- name: Create backup data directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ backup_utils_user }}"
+    group: "{{ backup_utils_group }}"
+    mode: '0750'
+  loop:
+    - "{{ backup_utils_data_dir }}"
+    - "{{ backup_utils_data_dir }}/snapshots"
+    - "{{ backup_utils_tmp_dir | default('/tmp/github-backups') }}"
+
+- name: Update SSH configuration if needed
+  ansible.builtin.blockinfile:
+    path: "/home/{{ backup_utils_user }}/.ssh/config"
+    create: true
+    owner: "{{ backup_utils_user }}"
+    group: "{{ backup_utils_group }}"
+    mode: '0600'
+    block: |
+      Host {{ ghe_hostname }}
+        HostName {{ ghe_hostname }}
+        User {{ ghe_ssh_user }}
+        Port {{ ghe_port }}
+        IdentityFile {{ backup_utils_install_dir }}/credentials/ghe-ssh-key
+        StrictHostKeyChecking no
+  when: backup_utils_install_dir + '/credentials/ghe-ssh-key' is file
+
+- name: Initialize backup settings
+  ansible.builtin.command:
+    cmd: "{{ backup_utils_install_dir }}/bin/ghe-backup -v"
+  become: true
+  become_user: "{{ backup_utils_user }}"
+  changed_when: false
+  failed_when: false
+  register: initial_backup_check
+  when: backup_config_updated is changed
