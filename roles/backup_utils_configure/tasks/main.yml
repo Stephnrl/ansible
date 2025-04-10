@@ -1,0 +1,43 @@
+---
+# GitHub Enterprise Server Backup Utilities - Configuration Role
+
+- name: Include OS-specific variables
+  ansible.builtin.include_vars: "{{ item }}"
+  with_first_found:
+    - "{{ ansible_distribution | lower }}-{{ ansible_distribution_major_version }}.yml"
+    - "{{ ansible_os_family | lower }}-{{ ansible_distribution_major_version }}.yml"
+    - "{{ ansible_distribution | lower }}.yml"
+    - "{{ ansible_os_family | lower }}.yml"
+    - "main.yml"
+  tags: ['always']
+
+- name: Check for existing configuration file
+  ansible.builtin.stat:
+    path: "{{ backup_utils_install_dir }}/backup.config"
+  register: backup_config
+  tags: ['always']
+
+- name: Backup existing configuration file if exists
+  ansible.builtin.copy:
+    src: "{{ backup_utils_install_dir }}/backup.config"
+    dest: "{{ backup_utils_install_dir }}/backup.config.bak.{{ ansible_date_time.date }}"
+    remote_src: true
+  when: backup_config.stat.exists | bool
+  tags: ['backup', 'config']
+
+- name: Configure backup utilities
+  ansible.builtin.import_tasks: configure.yml
+  tags: ['configure', 'config']
+
+- name: Validate configuration
+  ansible.builtin.command:
+    cmd: "{{ backup_utils_install_dir }}/bin/ghe-host-check"
+  register: host_check_result
+  changed_when: false
+  tags: ['validate', 'check']
+
+- name: Display validation results
+  ansible.builtin.debug:
+    var: host_check_result.stdout_lines
+  when: host_check_result is defined
+  tags: ['validate', 'check']
