@@ -1,0 +1,46 @@
+---
+# GitHub Enterprise Server Backup Utilities - Scheduling Role
+
+- name: Include OS-specific variables
+  ansible.builtin.include_vars: "{{ item }}"
+  with_first_found:
+    - "{{ ansible_distribution | lower }}-{{ ansible_distribution_major_version }}.yml"
+    - "{{ ansible_os_family | lower }}-{{ ansible_distribution_major_version }}.yml"
+    - "{{ ansible_distribution | lower }}.yml"
+    - "{{ ansible_os_family | lower }}.yml"
+    - "main.yml"
+  tags: ['always']
+
+- name: Check for cron command
+  ansible.builtin.command:
+    cmd: which cron
+  register: cron_check
+  changed_when: false
+  failed_when: false
+  tags: ['check']
+
+- name: Check for systemd
+  ansible.builtin.stat:
+    path: /usr/bin/systemctl
+  register: systemd_check
+  tags: ['check']
+
+- name: Determine scheduling method
+  ansible.builtin.set_fact:
+    use_systemd: "{{ systemd_check.stat.exists | bool }}"
+    use_cron: "{{ cron_check.rc == 0 }}"
+  tags: ['always']
+
+- name: Configure backup scheduling
+  ansible.builtin.import_tasks: schedule.yml
+  when: backup_schedule_enabled | bool
+  tags: ['schedule']
+
+- name: Display scheduling status
+  ansible.builtin.debug:
+    msg: 
+      - "GitHub Enterprise Backup scheduling:"
+      - "- Enabled: {{ backup_schedule_enabled | bool }}"
+      - "- Schedule: {{ 'Every day at ' + backup_schedule_hour + ':' + backup_schedule_minute if backup_schedule_enabled else 'Disabled' }}"
+      - "- Method: {{ 'systemd timer' if use_systemd else 'cron' if use_cron else 'Not configured' }}"
+  tags: ['info']
